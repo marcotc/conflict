@@ -1,0 +1,31 @@
+apply plugin: 'java'
+apply plugin: 'com.marcotc.gradle.conflict'
+ 
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+ 
+dependencies {
+    testCompile 'junit:junit:4.11'
+	compile 'com.dyuproject.protostuff:protostuff-api:1.0.8'
+	compile 'io.airlift:log:0.106'
+	compile 'com.proofpoint.platform:log:1.17'
+	compile 'com.googlecode.openbox:log:2.0.8'
+	compile 'com.owteam.engUtils:log:2.0.0'
+}
+ 
+jar {
+    manifest {
+    }
+}
+
+buildscript {
+    repositories {
+	    mavenCentral()
+		mavenLocal()
+    }
+    dependencies {
+		classpath 'com.marcotc.gradle:conflict:+'
+    }
+}
