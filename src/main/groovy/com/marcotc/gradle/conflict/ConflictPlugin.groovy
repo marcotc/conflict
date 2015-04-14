@@ -8,7 +8,10 @@ import org.gradle.api.file.FileCollection
 import org.gradle.api.file.RelativePath
 import groovy.transform.ToString
 import com.google.common.collect.TreeMultimap
-import com.google.common.base.Joiner 
+import com.google.common.base.Joiner
+import org.gradle.api.artifacts.Dependency
+import org.gradle.api.artifacts.DependencyResolveDetails
+import org.gradle.api.Action
 
 // TODO Fix this whole mess
 public class ConflictPlugin implements Plugin<Project> {
@@ -16,8 +19,9 @@ public class ConflictPlugin implements Plugin<Project> {
     static final String DESC = 'Show files from dependencies that have the same path'
 	
 	@ToString
-	class Resource {
+	public static class Resource {
 		File source;
+		Object dependency;
 		Collection<File> relativePaths;
 	}
 	
@@ -26,29 +30,51 @@ public class ConflictPlugin implements Plugin<Project> {
 			FileCollection files = project.files([])
 			List<Resource> things = [];
 			
-			Set<File> paths = [] as Set
-			if (project.sourceSets.main.output.resourcesDir?.exists())
-				paths += project.sourceSets.main.output.resourcesDir
-			if (project.sourceSets.main.output.classesDir?.exists())
-				paths += project.sourceSets.main.output.classesDir
-
-			paths.each {
-				def depFiles = []
-				project.fileTree(it).visit{
-					depFiles += it.isDirectory() ? [] : it.getRelativePath()
-				}
-				things += new Resource(source: it, relativePaths: depFiles)
-			}
-			
 			def conf = project.configurations.runtime
-			things += conf.collect { f ->
+			
+			conf.getResolutionStrategy().eachDependency(new Action<DependencyResolveDetails>() {
+				@Override
+				public void execute(DependencyResolveDetails details) {
+					things += new Resource(dependency: details.getTarget())
+				}
+			});
+			
+			def i = 0
+			conf.collect { f ->
 				def depTree = f.isDirectory() ? project.fileTree(f) : project.zipTree(f)
 				def depFiles = []
 				depTree.visit {
-					depFiles += it.getRelativePath()
+					if (!it.isDirectory()) {
+						depFiles += it.getRelativePath()
+					}
 				}
 				
-				new Resource(source: f, relativePaths: depFiles)
+				def dep = things[i++]
+				dep.source = f
+				dep.relativePaths = depFiles
+			}
+			
+			if (project.sourceSets.main.output.resourcesDir?.exists()) {
+				Set<File> paths = [] + project.sourceSets.main.output.resourcesDir
+				
+				paths.each {
+					def depFiles = []
+					project.fileTree(it).visit{
+						depFiles += it.isDirectory() ? [] : it.getRelativePath()
+					}
+					things += new Resource(source: it, relativePaths: depFiles, dependency:project.sourceSets.main.resources.name)
+				}
+			}
+			if (project.sourceSets.main.output.classesDir?.exists()) {
+				Set<File> paths = [] + project.sourceSets.main.output.classesDir
+				
+				paths.each {
+					def depFiles = []
+					project.fileTree(it).visit{
+						depFiles += it.isDirectory() ? [] : it.getRelativePath()
+					}
+					things += new Resource(source: it, relativePaths: depFiles, dependency:project.sourceSets.main.java.name)
+				}
 			}
 			
 			def comparator1 = new Comparator<RelativePath>() {
@@ -57,16 +83,16 @@ public class ConflictPlugin implements Plugin<Project> {
 				}
 			};
 			
-			def comparator2 = new Comparator<String>() {
-				public int compare(String o1, String o2) {
-					return o1.compareTo(o2)
+			def comparator2 = new Comparator<Resource>() {
+				public int compare(Resource o1, Resource o2) {
+					return o1.source.getCanonicalPath().compareTo(o2.source.getCanonicalPath())
 				}
 			};
 			
 			def map = TreeMultimap.create(comparator1, comparator2)
 			things.each { resource ->
 				resource.relativePaths.each {
-					map.put(it, resource.source.getCanonicalPath())
+					map.put(it, resource)
 				}
 			}
 			
@@ -74,13 +100,20 @@ public class ConflictPlugin implements Plugin<Project> {
 				def sources = it.getValue()
 				if (sources.size() > 1) {
 					def file = it.getKey()
+					def fileStr = file.toString()
+					def classStr = ".class"
+					if (fileStr.endsWith(classStr)) {
+						fileStr += " [" + fileStr.substring(0, fileStr.length() - classStr.length()).replace('/','.') + "]"
+					}
+					
 					println ""
-					println "File: " + file
-					println "Sources: " + Joiner.on("\n         ").join(sources)
+					println "File:\t" + fileStr
+					println "Sources: "
+					sources.each {
+						println "\t" + it.dependency.toString() + ": " + it.source.toString()
+					}
 				}
 			}
-			
-			//println project.getGradle().getGradleUserHomeDir() 
 		}
 		
 		task.dependsOn project.tasks.classes

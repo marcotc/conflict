@@ -32,7 +32,7 @@ publishing {
         maven(MavenPublication) {
             groupId 'com.marcotc.gradle'
             artifactId 'conflict'
-            version '0.1'
+            version '0.1.1'
 
             from components.java
 			artifact sourcesJar
@@ -69,10 +69,10 @@ bintray {
         //attributes= ['a': ['ay1', 'ay2'], 'b': ['bee'], c: 'cee'] //Optional package-level attributes
         //Optional version descriptor
         version {
-            name = 'conflict-0.1' //Bintray logical version name
+            name = 'conflict-0.1.1' //Bintray logical version name
             desc = 'First release'
             //released  = 'optional, date of the version release' //2 possible values: date in the format of 'yyyy-MM-dd'T'HH:mm:ss.SSSZZ' OR a java.util.Date instance
-            vcsTag = '0.1'
+            vcsTag = '0.1.1'
             //attributes = ['gradle-plugin': 'com.use.less:com.use.less.gradle:gradle-useless-plugin'] //Optional version-level attributes
             /*gpg {
                 sign = true //Determines whether to GPG sign the files. The default is false
